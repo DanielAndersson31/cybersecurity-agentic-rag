@@ -1,1 +1,1 @@
-# cybersecurity-agentic-rag
+# Cybersecurity-Agentic-RAG
