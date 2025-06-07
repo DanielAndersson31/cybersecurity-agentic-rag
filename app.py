@@ -1,20 +1,15 @@
-# Test imports
-
-
 import streamlit as st
-import pandas as pd
-import requests
-import chromadb as cb
-import openai
+from database.vector_store import DatabaseManager
 
-print("Starting app...")
-print(f"pandas version: {pd.__version__}")
-print(f"requests version: {requests.__version__}")
-print(f"chromadb version: {cb.__version__}")
-print(f"openai version: {openai.__version__}")
-print(f"streamlit version: {st.__version__}")
-
-print("Imports successful")
+def main():
+    """Main Streamlit application"""
+    st.title("Cybersecurity Agentic RAG System")
+    st.write("Welcome to the Cybersecurity Knowledge Base")
+    
+    # TODO: Add your Streamlit UI components here
+    
+if __name__ == "__main__":
+    main()
 
 
 

@@ -1,0 +1,162 @@
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from .document_processor import process_all_documents
+from pathlib import Path
+import torch
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+
+class DatabaseManager:
+    """Manages vector database operations including creation, population, and testing."""
+    
+    def __init__(self, persist_directory: str = "./chroma_db"):
+        self.persist_directory = persist_directory
+        self.vector_store = None
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="BAAI/bge-large-en-v1.5",
+            model_kwargs={'device': device},
+            encode_kwargs={
+                'normalize_embeddings': True,
+                'batch_size': 128
+            },
+            show_progress=True
+        )
+    
+    def _create_vector_store(self) -> Chroma:
+        """Create and return a Chroma vector store with OpenAI embeddings."""
+        try:
+            # Ensure the directory exists
+            Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
+            
+            vector_store = Chroma(
+                persist_directory=self.persist_directory,
+                embedding_function=self.embeddings
+            )
+            return vector_store
+        except Exception as e:
+            raise ValueError(f"Error creating vector store: {e}")
+
+    def populate_database(self):
+        """Populate the vector store with processed documents."""
+        try:
+            print("Processing all documents for vector store population...")
+            
+            # Get processed documents
+            all_documents, all_metadatas, all_ids = process_all_documents()
+            
+            if not all_documents:
+                print("No documents to add to the vector store.")
+                return False
+                
+            print(f"Creating vector store from {len(all_documents)} documents...")
+            
+            # Create vector store from documents
+            self.vector_store = Chroma.from_texts(
+                texts=all_documents,
+                metadatas=all_metadatas,
+                embedding=self.embeddings,
+                persist_directory=self.persist_directory,
+                ids=all_ids
+            )
+            
+            # Note: Chroma automatically persists when persist_directory is specified
+            print(f"Vector store populated with {len(all_documents)} documents")
+            return True
+            
+        except Exception as e:
+            print(f"Error populating vector store: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_vector_store(self) -> Chroma:
+        """Get the existing vector store or create a new one."""
+        if not self.vector_store:
+            self.vector_store = self._create_vector_store()
+        return self.vector_store
+    
+    def setup_database(self):
+        """Setup and populate the vector database."""
+        print("Setting up cybersecurity knowledge database...")
+        
+        if self.populate_database():
+            print("Vector store populated successfully!")
+            return True
+        else:
+            print("Failed to populate vector store.")
+            return False
+    
+    def search(self, query: str, agent_type: str = None, k: int = 5):
+        """Search the vector store with optional agent type filtering."""
+        if not self.vector_store:
+            self.get_vector_store()
+            
+        try:
+            if agent_type:
+                # Create filter for agent type
+                where_filter = {"$or": [
+                    {"agent_type": agent_type},
+                    {"agent_type": "shared"}
+                ]} if agent_type != "shared" else {"agent_type": "shared"}
+                
+                results = self.vector_store.similarity_search_with_score(
+                    query=query,
+                    k=k,
+                    filter=where_filter
+                )
+            else:
+                results = self.vector_store.similarity_search_with_score(
+                    query=query,
+                    k=k
+                )
+            
+            return results
+            
+        except Exception as e:
+            print(f"Search error: {e}")
+            # Fallback to simple similarity search without filter
+            try:
+                return self.vector_store.similarity_search(query, k=k)
+            except Exception as fallback_error:
+                print(f"Fallback search also failed: {fallback_error}")
+                return []
+    
+    def test_searches(self):
+        """Test search functionality for different agent types."""
+        if not self.vector_store:
+            print("Vector store not initialized. Run setup_database() first.")
+            return
+            
+        print("\nTesting search functionality:")
+        
+        search_queries = {
+            "Incident Response": ("ransomware response", "incident_response"),
+            "Threat Intelligence": ("malicious IP", "threat_intelligence"), 
+            "Prevention": ("security framework", "prevention"),
+            "Shared Knowledge": ("PowerShell", "shared")
+        }
+
+        for search_name, (query, agent_type) in search_queries.items():
+            print(f"\n--- {search_name} Search (Query: '{query}', Agent Type: '{agent_type}') ---")
+            
+            results = self.search(query, agent_type, k=2)
+            
+            if results:
+                print(f"Found {len(results)} results:")
+                for i, result in enumerate(results):
+                    if isinstance(result, tuple):  # (doc, score)
+                        doc, score = result
+                        print(f"  Result {i+1} (Score: {score:.4f}):")
+                        print(f"    Metadata: {doc.metadata}")
+                        content = doc.page_content
+                    else:  # just doc
+                        doc = result
+                        print(f"  Result {i+1}:")
+                        print(f"    Metadata: {doc.metadata}")
+                        content = doc.page_content
+                    
+                    print(f"    Document: {content[:200]}{'...' if len(content) > 200 else ''}")
+                    print("-" * 20)
+            else:
+                print("No results found.") 
