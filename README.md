@@ -79,6 +79,18 @@ This will:
 3.  Print database population statistics.
 4.  Run a series of test searches for different agent types and print the results.
 
+## Recent Updates
+
+- ✅ **Local Embeddings**: Replaced OpenAI API with local HuggingFace BAAI/bge-large-en-v1.5 model
+- ✅ **GPU Support**: Added automatic CUDA/CPU device detection for hardware acceleration
+- ✅ **Performance**: Optimized batch size (128) for faster processing
+- ✅ **Agent State Management**: Created TypeDict-based state system for agent workflow tracking
+- ✅ **Specialized Tools**: Implemented LangChain tools for domain-specific knowledge base searching
+- ✅ **Expert Agents**: Built three specialized agents for Incident Response, Threat Intelligence, and Prevention
+- ✅ **Router Agent**: Created intelligent query classification system with JSON-based routing
+- ✅ **LangGraph Workflow**: Implemented StateGraph orchestration system with conditional routing
+- ✅ **Agent-Type Filtering**: Enhanced vector store search with metadata filtering for targeted retrieval
+
 ## Further Development Ideas
 
 - Implement specific agent logic in the `agents/` directory.
