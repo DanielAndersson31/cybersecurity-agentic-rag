@@ -4,6 +4,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from typing import Optional
+import os
 
 from .state import AgentState, ConversationTurn
 from .router import RouterAgent
@@ -17,7 +18,7 @@ class CybersecurityRAGWorkflow:
         self.ir_agent = IncidentResponseAgent()
         self.ti_agent = ThreatIntelligenceAgent()
         self.prevention_agent = PreventionAgent()
-        self.db_path = "agent_rag_history.db"
+        self.db_path = os.path.join("data", "memory", "agent_rag_history.db")
         self.workflow = self._build_workflow()
         
     async def initialize(self):

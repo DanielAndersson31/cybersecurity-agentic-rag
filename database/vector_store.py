@@ -10,7 +10,7 @@ print(f"Using device: {device}")
 class DatabaseManager:
     """Manages vector database operations including creation, population, and testing."""
     
-    def __init__(self, persist_directory: str = "./chroma_db"):
+    def __init__(self, persist_directory: str = "data/vectorstore"):
         self.persist_directory = persist_directory
         self.vector_store = None
         self.embeddings = HuggingFaceEmbeddings(
