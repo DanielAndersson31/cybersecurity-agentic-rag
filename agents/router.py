@@ -12,6 +12,10 @@ class RouterAgent:
         current_query_message = state["messages"][-1]
         query_content = current_query_message.content if isinstance(current_query_message, HumanMessage) else ""
         
+        collaboration_info = self._detect_collaboration_need(query_content)
+        state["collaboration_mode"] = collaboration_info.get("mode")
+        state["needs_collaboration"] = collaboration_info.get("needs_collaboration")
+        
         all_messages = state["messages"]
         is_follow_up = self._detect_follow_up(query_content, all_messages[:-1])
         state["is_follow_up"] = is_follow_up
@@ -27,11 +31,15 @@ class RouterAgent:
         - threat_intelligence: For IOCs, threat actors, TTPs, vulnerability analysis, threat hunting, attribution
         - prevention: For security frameworks, policies, best practices, risk assessment, compliance, proactive security measures
 
+        Consider if the query spans multiple domains or requires collaboration between specialists.
+
         Respond with only a JSON object in this format:
         {
             "agent_type": "incident_response|threat_intelligence|prevention",
             "confidence": 0.8,
-            "reasoning": "Brief explanation"
+            "reasoning": "Brief explanation",
+            "requires_collaboration": false,
+            "collaboration_agents": []
         }"""
         
         router_messages = [SystemMessage(content=system_prompt)]
@@ -76,3 +84,26 @@ class RouterAgent:
         has_recent_context = len(conversation_history) > 1
 
         return has_follow_up_phrase or (is_short_question and has_recent_context)
+    
+    def _detect_collaboration_need(self, query: str) -> dict:
+        """Detect collaboration needs and determine strategy"""
+        query_lower = query.lower()
+        
+        # Multi-domain patterns
+        multi_domain = any([
+            ("respond" in query_lower and "prevent" in query_lower),
+            ("investigate" in query_lower and "attribution" in query_lower),
+            any(word in query_lower for word in ["comprehensive", "complete analysis", "multiple perspectives"])
+        ])
+        
+        # Low confidence patterns
+        complex_query = any(word in query_lower for word in [
+            "complex", "detailed analysis", "expert opinion", "best practice"
+        ])
+        
+        if multi_domain:
+            return {"mode": "multi_perspective", "needs_collaboration": True}
+        elif complex_query:
+            return {"mode": "consultation", "needs_collaboration": True}
+        else:
+            return {"mode": "single_agent", "needs_collaboration": False}

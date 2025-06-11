@@ -68,7 +68,7 @@ Next Steps
 - Add agent performance monitoring and analytics
 - Create API endpoints for agent services
 
-## 2025-01-09
+## 2025-06-09
 
 :white_check_mark: Completed Steps
 
@@ -106,4 +106,51 @@ Agents related stuff to add:
 - Multi-turn dialogue ✅ **COMPLETED**
 - Mutli-agent dialogue (Agents collaboration)
 
+- Hybrid Retrieval system - BM25 Keyword search, reranking models to combine semantic + keyword results, metadata filtering improvements
+- Advanced chunking srategy - Replace basic RecursiveCharacterTextSplitter with
+  - Semantic chunking that respects document structure
+  - Overlapping context windwos with intelligent boundaries
+  - Chunk metadata enrichment
+  - Multi-level chunking (summary + detail chunk)
+- RAG Evaluation - RAGAS? Faithfulness, answer relevanc and hallucation detection
+- Advanced agent collaboration
+  - Multi--agent workflow where agents consult eachother
+  - Confidence based routing, routing to mutliple agents if confidence is low
+  - Expoert system integration for complex decision trees
+  - Automated escaltion to human experts
+
 Stay tuned
+
+## 2025-06-12
+
+:white_check_mark: Completed Steps
+
+1. **Command Line Interface**
+
+   - Added conversation management features
+   - Improved user interaction and feedback
+   - Enhanced error handling
+
+2. **Agent Collaboration**
+
+   - Implemented multi-agent interaction system
+   - Added support for different collaboration modes
+   - Enhanced state tracking for agent interactions
+
+3. **Query Routing**
+   - Improved question handling and context awareness
+   - Enhanced routing decisions
+   - Better confidence scoring
+
+:arrows_counterclockwise: Changed
+
+- Updated workflow structure
+- Enhanced state management
+- Improved routing system
+
+Next Steps
+
+- Build web interface
+- Add performance tracking
+- Enhance agent interactions
+- Develop advanced collaboration features

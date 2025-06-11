@@ -1,6 +1,6 @@
 # agents/specialized_agents.py
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from .state import AgentState
 from .tools import (
     search_incident_response_knowledge,
