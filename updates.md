@@ -68,4 +68,42 @@ Next Steps
 - Add agent performance monitoring and analytics
 - Create API endpoints for agent services
 
+## 2025-01-09
+
+:white_check_mark: Completed Steps
+
+1. **Conversation Memory & Multi-turn Dialogue**
+
+   - **State Management**: Enhanced AgentState with conversation history tracking and session management
+   - **Persistent Storage**: Implemented SQLite checkpointing for conversation persistence across sessions
+   - **Follow-up Detection**: Router now detects and handles follow-up questions intelligently
+   - **Context-Aware Agents**: All specialist agents now consider conversation history in responses
+
+2. **Enhanced Agent Architecture**
+
+   - **Message Integration**: Migrated to LangGraph's built-in message handling system
+   - **Conversation Flow**: Agents automatically maintain conversation context between interactions
+   - **Session Support**: Added session-based conversation tracking with unique identifiers
+
+:arrows_counterclockwise: Changed
+
+- **Agent Processing**: Evolved from stateless to stateful agents with conversation awareness
+- **Data Persistence**: Replaced in-memory storage with SQLite-based conversation persistence
+
+Next Steps
+
+- Implement enhanced CLI with conversation history commands
+- Add conversation analytics and session management features
+- Build web interface for multi-session agent interaction
+- Add conversation export and import functionality
+
+Agents related stuff to add:
+
+- Websearch
+- Confidence Score/Metric
+- Context Manager
+- ~~Conversation Memory(History)~~ ✅ **COMPLETED**
+- Multi-turn dialogue ✅ **COMPLETED**
+- Mutli-agent dialogue (Agents collaboration)
+
 Stay tuned

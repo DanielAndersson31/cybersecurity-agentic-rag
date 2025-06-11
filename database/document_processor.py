@@ -1,4 +1,3 @@
-import PyPDF2
 import json
 import csv
 from pathlib import Path
@@ -461,6 +460,11 @@ def _process_threat_intelligence_data(threat_dir_path: Path) -> tuple[List[str],
     all_metadatas.extend(urlhaus_metas)
     all_ids.extend(urlhaus_ids)
     
+    mitre_texts, mitre_metas, mitre_ids = _process_mitre_attack_data(threat_dir_path  / "mitre-enterprise-attack.json")
+    all_doc_texts.extend(mitre_texts)
+    all_metadatas.extend(mitre_metas)
+    all_ids.extend(mitre_ids)
+    
     return all_doc_texts, all_metadatas, all_ids
 
 def process_all_documents(data_dir: str = "data/raw") -> tuple[List[str], List[Dict[str, Any]], List[str]]:
@@ -492,12 +496,6 @@ def process_all_documents(data_dir: str = "data/raw") -> tuple[List[str], List[D
     all_doc_texts.extend(ir_texts)
     all_metadatas.extend(ir_metas)
     all_ids.extend(ir_ids)
-
-    # Process MITRE ATT&CK data
-    mitre_texts, mitre_metas, mitre_ids = _process_mitre_attack_data(data_path / "mitre_attack" / "enterprise-attack.json")
-    all_doc_texts.extend(mitre_texts)
-    all_metadatas.extend(mitre_metas)
-    all_ids.extend(mitre_ids)
 
     # Process Threat Intelligence data
     threat_texts, threat_metas, threat_ids = _process_threat_intelligence_data(data_path / "threat_intelligence")

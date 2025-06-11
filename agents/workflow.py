@@ -1,103 +1,112 @@
+import uuid
+import aiosqlite
 from langgraph.graph import StateGraph, END
-from .state import AgentState
+from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from typing import Optional
+
+from .state import AgentState, ConversationTurn
 from .router import RouterAgent
 from .specialized_agents import IncidentResponseAgent, ThreatIntelligenceAgent, PreventionAgent
-from .tools import search_shared_knowledge
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
-class CybersecurityRagWorkflow:
+
+
+class CybersecurityRAGWorkflow:
     def __init__(self) -> None:
         self.router = RouterAgent()
         self.ir_agent = IncidentResponseAgent()
         self.ti_agent = ThreatIntelligenceAgent()
         self.prevention_agent = PreventionAgent()
-        
+        self.db_path = "agent_rag_history.db"
         self.workflow = self._build_workflow()
-        self.app = self.workflow.compile()
+        
+    async def initialize(self):
+        """Initialize the workflow with an async SQLite connection."""
+        conn = await aiosqlite.connect(self.db_path)
+        self.checkpointer = AsyncSqliteSaver(conn=conn)
+        self.app = self.workflow.compile(checkpointer=self.checkpointer)
         
     def _build_workflow(self) -> StateGraph:
         """Build the state graph for the RAG workflow."""
-        workflow = StateGraph()
+        workflow = StateGraph(AgentState)
         
         # Add Nodes
-        workflow.add_node("router",self.router_query)
+        workflow.add_node("router", self.router.router_query)
         workflow.add_node("incident_response", self.ir_agent.process)
         workflow.add_node("threat_intelligence", self.ti_agent.process)
         workflow.add_node("prevention", self.prevention_agent.process)
-        workflow.add_node("shared", self._handle_shared_query)
         
         # Set Entry Point
-        workflow.set_entry("router")
+        workflow.set_entry_point("router")
         
         # Add conditional edges based on routing decision
-        workflow.add_conditional_edge(
+        workflow.add_conditional_edges(
             "router",
             self._route_to_specialist,
             {
                 "incident_response": "incident_response",
                 "threat_intelligence": "threat_intelligence",
-                "prevention": "prevention",
-                "shared": "shared"
+                "prevention": "prevention"
             }
         )
         workflow.add_edge("incident_response", END)
         workflow.add_edge("threat_intelligence", END)
         workflow.add_edge("prevention", END)
-        workflow.add_edge("shared", END)
         return workflow
     
     def _route_to_specialist(self, state: AgentState) -> str:
         """Route to the appropriate specialist based on agent type."""
         return state["agent_type"]
-    def _handle_shared_query(self, state: AgentState) -> AgentState:
-        """Handle shared queries that don't fit any specialist category."""
-        query = state["query"]
-        
-        # Retrieve shared knowledge documents
-        shared_docs = search_shared_knowledge.invoke({"query": query})
-        context = "\n\n".join(shared_docs[:5])
-        
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
-        
-        system_prompt = """You are a general cybersecurity expert. 
-        Based on the provided context, provide comprehensive cybersecurity guidance.
-        Cover relevant aspects of security that apply to the query."""
-        
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"Context:\n{context}\n\nQuery: {query}")
-        ]
-        
-        response = llm.invoke(messages)
-        
-        state["retrieved_docs"] = shared_docs
-        state["context"] = context
-        state["response"] = response.content
-        state["agent_type"] = "shared"
-        state["confidence_score"] = 0.8 if len(shared_docs) > 0 else 0.4
-        
-        return state
-    def process_query(self, query: str, agent_type: str = None) -> dict:
-        """Process a cybersecurity query through the RAG workflow."""
+
+    async def process_query(self, user_query: str, session_id: Optional[str] = None) -> dict:
+        if session_id is None:
+            session_id = str(uuid.uuid4())
+
+        initial_messages = [HumanMessage(content=user_query)]
         initial_state = {
-            "messages": [],
-            "query": query,
-            "agent_type": agent_type,
+            "messages": initial_messages,
+            "agent_type": None,
             "retrieved_docs": [],
-            "context": "",
-            "response": "",
             "confidence_score": 0.0,
-            "needs_routing": agent_type is None
+            "needs_routing": True,
+            "session_id": session_id,
+            "is_follow_up": False
         }
-        
-        # Run the workflow
-        final_state = self.app.invoke(initial_state)
-        
+
+        config = {"configurable": {"thread_id": session_id}}
+
+        await self.app.ainvoke(initial_state, config=config)
+
+        retrieved_full_state = await self.app.aget_state(config)
+        retrieved_full_state = retrieved_full_state.values
+
+        last_response_content = ""
+        for msg in reversed(retrieved_full_state["messages"]):
+            if isinstance(msg, AIMessage):
+                last_response_content = msg.content
+                break
+
+        conversation_turns_for_output = []
+        for i in range(0, len(retrieved_full_state["messages"]) - 1, 2):
+            user_msg = retrieved_full_state["messages"][i]
+            agent_msg = retrieved_full_state["messages"][i+1]
+            if isinstance(user_msg, HumanMessage) and isinstance(agent_msg, AIMessage):
+                conversation_turns_for_output.append(
+                    ConversationTurn(
+                        user_query=user_msg.content,
+                        agent_response=agent_msg.content,
+                        agent_type="unknown",
+                        timestamp="N/A"
+                    )
+                )
+
         return {
-            "query": final_state["query"],
-            "response": final_state["response"],
-            "agent_type": final_state["agent_type"],
-            "confidence_score": final_state["confidence_score"],
-            "num_docs_retrieved": len(final_state["retrieved_docs"])
+            "session_id": session_id,
+            "user_query": user_query,
+            "response": last_response_content,
+            "agent_type": retrieved_full_state["agent_type"],
+            "confidence_score": retrieved_full_state["confidence_score"],
+            "num_docs_retrieved": len(retrieved_full_state.get("retrieved_docs", [])),
+            "full_conversation_messages": retrieved_full_state["messages"],
+            "conversation_history_summary": conversation_turns_for_output
         }
