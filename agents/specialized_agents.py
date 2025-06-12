@@ -48,13 +48,48 @@ class BaseAgent:
         agent_messages.extend(relevant_history)
         
         response = self.llm.invoke(agent_messages)
-
-        state["retrieved_docs"] = all_docs
-        state["context"] = context
+        state["messages"].append(response)
         state["agent_type"] = self.agent_type
         state["confidence_score"] = 0.9 if len(all_docs) > 0 else 0.3
+        state["retrieved_docs"] = all_docs
         
+        return state
+
+    async def process_async(self, state: AgentState) -> AgentState:
+        """Async version of process method."""
+        current_user_query = ""
+        
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                current_user_query = msg.content
+                break
+        
+        # Make search async
+        all_docs = await self.search_tool.ainvoke({"query": current_user_query})
+        doc_contents = []
+        for result in all_docs[:5]:
+            if isinstance(result, tuple):
+                doc, score = result
+                doc_contents.append(doc.page_content)
+            else:
+                doc_contents.append(result.page_content)
+        context = "\n\n".join(doc_contents)
+      
+        agent_messages = [SystemMessage(content=self.system_prompt)]
+        agent_messages.append(HumanMessage(content=f"Context from knowledge base:\n{context}"))
+
+        relevant_history = []
+        for message in state["messages"]:
+            if isinstance(message, (HumanMessage, AIMessage)):
+                relevant_history.append(message)
+        
+        agent_messages.extend(relevant_history)
+        
+        response = await self.llm.ainvoke(agent_messages)
         state["messages"].append(response)
+        state["agent_type"] = self.agent_type
+        state["confidence_score"] = 0.9 if len(all_docs) > 0 else 0.3
+        state["retrieved_docs"] = all_docs
 
         return state
 

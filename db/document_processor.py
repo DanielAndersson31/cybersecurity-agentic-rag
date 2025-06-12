@@ -467,7 +467,7 @@ def _process_threat_intelligence_data(threat_dir_path: Path) -> tuple[List[str],
     
     return all_doc_texts, all_metadatas, all_ids
 
-def process_all_documents(data_dir: str = "data/raw") -> tuple[List[str], List[Dict[str, Any]], List[str]]:
+def process_all_documents(data_dir: str = "data/documents") -> tuple[List[str], List[Dict[str, Any]], List[str]]:
     """
     Processes all specified documents from the data directory, 
     chunks them, and prepares them for database ingestion.

@@ -3,14 +3,15 @@ Database setup script for the cybersecurity knowledge base.
 This script initializes and populates the vector database with cybersecurity documents.
 """
 
-from database.vector_store import DatabaseManager
+from db.vector_store import DatabaseManager
 
-def setup_and_test_database(persist_directory: str = "./chroma_db"):
+def setup_and_test_database(persist_directory: str = None):
     """
     Main function to setup and test the cybersecurity knowledge database.
     
     Args:
-        persist_directory (str): Directory to store the Chroma database
+        persist_directory (str, optional): Directory to store the Chroma database.
+            If None, uses default path from DatabaseManager.
         
     Returns:
         DatabaseManager: Initialized database manager instance
@@ -35,7 +36,7 @@ def setup_and_test_database(persist_directory: str = "./chroma_db"):
 
 def main():
     """Main execution function."""
-    db_manager = setup_and_test_database("./chroma_db")
+    db_manager = setup_and_test_database()
     
     if db_manager:
         print("\nDatabase is ready for use!")

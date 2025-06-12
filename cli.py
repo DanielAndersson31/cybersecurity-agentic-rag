@@ -22,9 +22,15 @@ class CybersecurityRAGApp:
         print("🛡️  CYBERSECURITY RAG ASSISTANT")
         print("="*60)
         print("Ask any cybersecurity question and the system will automatically")
-        print("route it to the most appropriate expert agent:")
+        print("route it to the most appropriate expert agent or team:")
         print("")
-        print("🚨 Incident Response • 🕵️ Threat Intelligence • 🛡️ Prevention • 📚 General")
+        print("🚨 Incident Response • 🕵️ Threat Intelligence • 🛡️ Prevention")
+        print("🤝 Team Collaboration (Multi-agent analysis)")
+        print("")
+        print("The system can automatically engage multiple experts when needed:")
+        print("• Complex queries requiring multiple perspectives")
+        print("• Questions spanning multiple security domains")
+        print("• High-stakes scenarios needing comprehensive analysis")
         print("")
         print("Special commands:")
         print("  /new     - Start a new conversation")
@@ -56,7 +62,7 @@ class CybersecurityRAGApp:
                 
                 # Process the query - let the system auto-route
                 print("\n🔄 Processing query...")
-                result = await self.workflow.process_query(query, session_id=self.current_session_id)
+                result = await self.workflow.process_query_async(query, session_id=self.current_session_id)
                 
                 # Display results
                 self._display_result(result)
@@ -139,14 +145,14 @@ class CybersecurityRAGApp:
             "incident_response": "🚨",
             "threat_intelligence": "🕵️", 
             "prevention": "🛡️",
-            "shared": "📚"
+            "team_collaboration": "🤝"
         }
         
         agent_names = {
             "incident_response": "Incident Response Specialist",
             "threat_intelligence": "Threat Intelligence Analyst",
-            "prevention": "Security Prevention Expert", 
-            "shared": "General Cybersecurity Expert"
+            "prevention": "Security Prevention Expert",
+            "team_collaboration": "Cybersecurity Team"
         }
         
         icon = agent_icons.get(result['agent_type'], "🤖")
@@ -156,8 +162,31 @@ class CybersecurityRAGApp:
         print("📋 RESPONSE")
         print("="*60)
         print(f"{icon} Expert: {name}")
-        print(f"📊 Confidence: {result['confidence_score']:.0%}")
+        
+        # Display collaboration information
+        collaboration_mode = result.get('collaboration_mode', 'single_agent')
+        print(f"🤝 Mode: {collaboration_mode.replace('_', ' ').title()}")
+        
+        if collaboration_mode != 'single_agent':
+            if result.get('consulting_agents'):
+                print(f"👥 Consulting Experts: {', '.join(result['consulting_agents'])}")
+            if result.get('collaboration_confidence'):
+                print(f"📊 Team Confidence: {result['collaboration_confidence']:.0%}")
+        else:
+            print(f"📊 Confidence: {result['confidence_score']:.0%}")
+            
         print(f"📚 Sources: {result['num_docs_retrieved']} documents")
+        
+        # Display individual agent responses if available
+        if result.get('agent_responses'):
+            print("\n" + "-"*40)
+            print("👥 Individual Expert Perspectives:")
+            for agent_type, response in result['agent_responses'].items():
+                agent_icon = agent_icons.get(agent_type, "🤖")
+                print(f"\n{agent_icon} {agent_names.get(agent_type, agent_type)}:")
+                print(response)
+            print("-"*40)
+        
         print("\n" + "-"*40)
         print(result['response'])
         print("="*60)
@@ -171,17 +200,21 @@ class CybersecurityRAGApp:
             "What are common indicators of compromise for APT groups?", 
             "What security frameworks should a startup implement?",
             "How does PowerShell work in cyberattacks?",
-            "What is the MITRE ATT&CK framework?"
+            "What is the MITRE ATT&CK framework?",
+            # Collaboration test queries
+            "We've detected suspicious PowerShell activity and need to both investigate and prevent future incidents",
+            "How should we handle a potential APT breach while implementing preventive measures?",
+            "What's the best approach to both respond to and prevent future phishing attacks?"
         ]
         
         for i, query in enumerate(test_queries, 1):
             print(f"\n{'='*60}")
-            print(f"🧪 TEST {i}/5: {query}")
+            print(f"🧪 TEST {i}/{len(test_queries)}: {query}")
             print("-" * 60)
             
             try:
                 # Let the system auto-route each query
-                result = await self.workflow.process_query(query)
+                result = await self.workflow.process_query_async(query)
                 self._display_result(result)
             except Exception as e:
                 print(f"❌ Test failed: {e}")

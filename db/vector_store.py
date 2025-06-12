@@ -2,16 +2,17 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from .document_processor import process_all_documents
 from pathlib import Path
+import asyncio
 import torch
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
 
 class DatabaseManager:
     """Manages vector database operations including creation, population, and testing."""
     
-    def __init__(self, persist_directory: str = "data/vectorstore"):
-        self.persist_directory = persist_directory
+    def __init__(self, persist_directory: str = "data/embeddings/chroma_db"):
+        # Use default path if persist_directory is None
+        self.persist_directory = Path(persist_directory if persist_directory is not None else "data/embeddings/chroma_db")
         self.vector_store = None
         self.embeddings = HuggingFaceEmbeddings(
             model_name="BAAI/bge-large-en-v1.5",
@@ -24,13 +25,13 @@ class DatabaseManager:
         )
     
     def _create_vector_store(self) -> Chroma:
-        """Create and return a Chroma vector store with OpenAI embeddings."""
+        """Create and return a Chroma vector store with BAAI/Bge-large-en-v1.5 embeddings."""
         try:
             # Ensure the directory exists
-            Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
+            self.persist_directory.mkdir(parents=True, exist_ok=True)
             
             vector_store = Chroma(
-                persist_directory=self.persist_directory,
+                persist_directory=str(self.persist_directory),
                 embedding_function=self.embeddings
             )
             return vector_store
@@ -56,7 +57,7 @@ class DatabaseManager:
                 texts=all_documents,
                 metadatas=all_metadatas,
                 embedding=self.embeddings,
-                persist_directory=self.persist_directory,
+                persist_directory=str(self.persist_directory),
                 ids=all_ids
             )
             
@@ -121,6 +122,12 @@ class DatabaseManager:
             except Exception as fallback_error:
                 print(f"Fallback search also failed: {fallback_error}")
                 return []
+    async def asearch(self, query: str, agent_type: str = None, k: int = 5):
+        """Async wrapper for the search method."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, lambda: self.search(query, agent_type, k)
+        )
     
     def test_searches(self):
         """Test search functionality for different agent types."""

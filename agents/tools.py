@@ -1,5 +1,6 @@
+# tools.py
 from langchain_core.tools import tool
-from database.vector_store import DatabaseManager
+from db.vector_store import DatabaseManager
 from integrations.web_search import TavilyWebSearch
 from typing import List, Optional
 
@@ -14,25 +15,33 @@ except ValueError as e:
     WEB_SEARCH_AVAILABLE = False
 
 @tool
-def search_incident_response_knowledge(query:str, k:int=5) -> List[dict]:
+async def search_incident_response_knowledge(query:str, k:int=5) -> List[dict]:
     """Search for incident response related documents."""
-    results = db_manager.search(query, agent_type="incident_response", k=k)
+    results = await db_manager.asearch(query, agent_type="incident_response", k=k) # Assuming db_manager has asearch
     return results
 
 @tool
-def search_threat_intelligence_knowledge(query: str, k: int = 5) -> List[dict]:
+async def search_threat_intelligence_knowledge(query: str, k: int = 5) -> List[dict]:
     """Search for threat intelligence related documents."""
-    results = db_manager.search(query, agent_type="threat_intelligence", k=k)
+    results = await db_manager.asearch(query, agent_type="threat_intelligence", k=k) # Assuming db_manager has asearch
     return results
 
 @tool
-def search_prevention_knowledge(query: str, k: int = 5) -> List[dict]:
+async def search_prevention_knowledge(query: str, k: int = 5) -> List[dict]:
     """Search for prevention related documents."""
-    results = db_manager.search(query, agent_type="prevention", k=k)
+    results = await db_manager.asearch(query, agent_type="prevention", k=k) # Assuming db_manager has asearch
     return results
 
 @tool
-def search_all_knowledge(query: str, k: int = 5) -> List[dict]:
+async def search_all_knowledge(query: str, k: int = 5) -> List[dict]:
     """Search for all knowledge documents across all agent types."""
-    results = db_manager.search(query, k=k)
+    results = await db_manager.asearch(query, k=k) # Assuming db_manager has asearch
     return results
+
+# Optional: If you use web search, ensure it's also async
+@tool
+async def web_search(query: str) -> str:
+    """Perform a web search."""
+    if WEB_SEARCH_AVAILABLE and web_searcher:
+        return await web_searcher.ainvoke({"query": query})
+    return "Web search is not available."
