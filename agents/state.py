@@ -18,6 +18,7 @@ class AgentState(TypedDict):
     agent_type: Optional[str]
     retrieved_docs: List[dict]
     confidence_score: Optional[float]
+    conversation_summary: Optional[str]  # Summary of the conversation
     
     collaboration_mode: Optional[str]  # "consultation", "multi_perspective"
     consulting_agents: List[str]  # Which agents to consult
@@ -25,3 +26,5 @@ class AgentState(TypedDict):
     needs_collaboration: bool
     primary_agent: Optional[str]  # Lead agent for this query
     collaboration_confidence: Optional[float]  # Team confidence
+    thought_process: Optional[List[str]]  # Steps taken in processing the query
+    needs_web_search: Optional[bool]  # Whether the query needs web search

@@ -14,9 +14,8 @@ from .specialized_agents import (
 from .workflow import CybersecurityRAGWorkflow
 from .collaboration import CollaborationSystem
 from .tools import (
-    search_incident_response_knowledge,
-    search_threat_intelligence_knowledge,
-    search_prevention_knowledge
+    search_knowledge_base,
+    web_search
 )
 
 __all__ = [
@@ -38,7 +37,7 @@ __all__ = [
     'CollaborationSystem',
     
     # Tools
-    'search_incident_response_knowledge',
-    'search_threat_intelligence_knowledge',
-    'search_prevention_knowledge'
+    'search_knowledge_base',
+    'web_search'
+    
 ]

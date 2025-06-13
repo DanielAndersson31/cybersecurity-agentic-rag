@@ -15,33 +15,34 @@ except ValueError as e:
     WEB_SEARCH_AVAILABLE = False
 
 @tool
-async def search_incident_response_knowledge(query:str, k:int=5) -> List[dict]:
-    """Search for incident response related documents."""
-    results = await db_manager.asearch(query, agent_type="incident_response", k=k) # Assuming db_manager has asearch
+async def search_knowledge_base(query: str, agent_type: Optional[str] = None, k: int = 5) -> List[dict]:
+    """Search the knowledge base for cybersecurity information.
+    
+    Args:
+        query: The search query
+        agent_type: Optional agent type to filter results (incident_response, threat_intelligence, prevention)
+        k: Number of results to return (default: 5)
+    """
+    results = await db_manager.asearch(query, agent_type=agent_type, k=k)
     return results
 
 @tool
-async def search_threat_intelligence_knowledge(query: str, k: int = 5) -> List[dict]:
-    """Search for threat intelligence related documents."""
-    results = await db_manager.asearch(query, agent_type="threat_intelligence", k=k) # Assuming db_manager has asearch
-    return results
-
-@tool
-async def search_prevention_knowledge(query: str, k: int = 5) -> List[dict]:
-    """Search for prevention related documents."""
-    results = await db_manager.asearch(query, agent_type="prevention", k=k) # Assuming db_manager has asearch
-    return results
-
-@tool
-async def search_all_knowledge(query: str, k: int = 5) -> List[dict]:
-    """Search for all knowledge documents across all agent types."""
-    results = await db_manager.asearch(query, k=k) # Assuming db_manager has asearch
-    return results
-
-# Optional: If you use web search, ensure it's also async
-@tool
-async def web_search(query: str) -> str:
-    """Perform a web search."""
-    if WEB_SEARCH_AVAILABLE and web_searcher:
-        return await web_searcher.ainvoke({"query": query})
-    return "Web search is not available."
+async def web_search(query: str, agent_type: Optional[str] = None) -> str:
+    """Perform a web search for cybersecurity information.
+    
+    Args:
+        query: The search query
+        agent_type: Optional agent type to enhance the query (incident_response, threat_intelligence, prevention)
+    """
+    if not WEB_SEARCH_AVAILABLE or not web_searcher:
+        return "Web search is not available. Please check your TAVILY_API_KEY environment variable."
+    
+    try:
+        # Directly call the async search method
+        result = await web_searcher.search(query, agent_type)
+        return result
+    except Exception as e:
+        import traceback
+        error_details = f"Web search failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+        print(error_details)  # Log the full error for debugging
+        return f"Web search failed: {str(e)}"

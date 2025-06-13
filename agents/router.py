@@ -20,7 +20,7 @@ class RouterAgent:
         state["collaboration_mode"] = collaboration_info.get("mode")
         state["needs_collaboration"] = collaboration_info.get("needs_collaboration")
         
-        print(f"Collaboration Detection:")
+        print("Collaboration Detection:")
         print(f"  - Mode: {collaboration_info.get('mode')}")
         print(f"  - Needs Collaboration: {collaboration_info.get('needs_collaboration')}")
         
@@ -43,6 +43,8 @@ class RouterAgent:
         - threat_intelligence: For IOCs, threat actors, TTPs, vulnerability analysis, threat hunting, attribution
         - prevention: For security frameworks, policies, best practices, risk assessment, compliance, proactive security measures
 
+        For general queries or non-cybersecurity topics, use the "prevention" agent as it can handle general information requests.
+
         Consider if the query spans multiple domains or requires collaboration between specialists.
 
         Respond with only a JSON object in this format:
@@ -52,7 +54,9 @@ class RouterAgent:
             "reasoning": "Brief explanation",
             "requires_collaboration": false,
             "collaboration_agents": []
-        }"""
+        }
+
+        IMPORTANT: Always return one of the three valid agent types: incident_response, threat_intelligence, or prevention. Never return "none" or any other value."""
         
         router_messages = [SystemMessage(content=system_prompt)]
         if is_follow_up:
@@ -67,24 +71,38 @@ class RouterAgent:
         
         try:
             routing_decision = json.loads(response.content)
-            state["agent_type"] = routing_decision.get("agent_type")
-            state["confidence_score"] = routing_decision.get("confidence")
+            agent_type = routing_decision["agent_type"]
+            
+            # Validate agent type
+            valid_agent_types = ["incident_response", "threat_intelligence", "prevention"]
+            if agent_type not in valid_agent_types:
+                print(f"⚠️ Invalid agent type '{agent_type}', defaulting to prevention")
+                agent_type = "prevention"
+            
+            state["agent_type"] = agent_type
+            state["confidence_score"] = routing_decision["confidence"]
+            state["needs_collaboration"] = routing_decision["requires_collaboration"]
+            state["consulting_agents"] = routing_decision["collaboration_agents"]
             state["needs_routing"] = False
             
-            print("\nRouting Decision:")
-            print(f"  - Selected Agent: {routing_decision.get('agent_type')}")
-            print(f"  - Confidence: {routing_decision.get('confidence')}")
-            print(f"  - Reasoning: {routing_decision.get('reasoning')}")
-            if routing_decision.get("requires_collaboration"):
-                print(f"  - Collaboration Agents: {', '.join(routing_decision.get('collaboration_agents', []))}")
-            
-        except (json.JSONDecodeError, KeyError):
-            state["agent_type"] = "prevention"  # Default to prevention for unclear queries
-            state["confidence_score"] = 0.3
+            print(f"\nRouting Decision:")
+            print(f"  - Agent Type: {agent_type}")
+            print(f"  - Confidence: {routing_decision['confidence']}")
+            print(f"  - Reasoning: {routing_decision['reasoning']}")
+            if routing_decision["requires_collaboration"]:
+                print(f"  - Collaboration Agents: {', '.join(routing_decision['collaboration_agents'])}")
+                
+        except json.JSONDecodeError:
+            print("Error: Could not parse routing decision as JSON")
+            state["agent_type"] = "prevention"  # Default to prevention agent
+            state["confidence_score"] = 0.5
             state["needs_routing"] = False
-            print("\n⚠️ Routing Error: Defaulting to prevention agent")
-        
-        print("-" * 40)
+        except KeyError as e:
+            print(f"Error: Missing key in routing decision: {e}")
+            state["agent_type"] = "prevention"  # Default to prevention agent
+            state["confidence_score"] = 0.5
+            state["needs_routing"] = False
+            
         return state
     
     def _detect_follow_up(self, query: str, conversation_history: list[BaseMessage]) -> bool:
@@ -106,8 +124,7 @@ class RouterAgent:
 
         has_recent_context = len(conversation_history) > 1
 
-        return has_follow_up_phrase or (is_short_question and has_recent_context)
-    
+        return has_follow_up_phrase or (is_short_question and has_recent_context)    
     def _detect_collaboration_need(self, query: str) -> dict:
         """Detect collaboration needs and determine strategy"""
         query_lower = query.lower()

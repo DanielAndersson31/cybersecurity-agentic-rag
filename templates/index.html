@@ -4,23 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cybersecurity RAG Assistant</title>
-    <link rel="stylesheet" href="/static/style.css" />
+
+    <!-- React & Babel for JSX -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- Marked.js for Markdown Parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   </head>
-  <body>
-    <div id="chat-container">
-      <div id="header">
-        <h2>Cybersecurity RAG Assistant</h2>
-      </div>
-      <div id="messages">
-        <!-- Messages will be appended here -->
-      </div>
-      <div id="input-area">
-        <form id="message-form">
-          <input type="text" id="message-input" placeholder="Ask a cybersecurity question..." autocomplete="off" />
-          <button type="submit">Send</button>
-        </form>
-      </div>
-    </div>
-    <script src="/static/script.js"></script>
+  <body class="bg-gray-100 dark:bg-gray-900">
+    <div id="root"></div>
+
+    <!-- Main React Application -->
+    <script type="text/babel" src="{{ url_for('static', path='/app.jsx') }}?v={{ now() }}"></script>
   </body>
 </html>

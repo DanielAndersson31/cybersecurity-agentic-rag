@@ -13,33 +13,6 @@ class CollaborationSystem:
             "prevention": prevention_agent
         }
 
-    async def _get_all_perspectives_async(self, query: str) -> Dict[str, Dict[str, str]]:
-        """Get responses and retrieved docs from all agents concurrently"""
-        async def process_agent(agent_name, agent):
-            state = {"messages": [HumanMessage(content=query)]}
-            response = await agent.process_async(state)
-            return agent_name, {
-                "response": response["messages"][-1].content,
-                "retrieved_docs": response.get("retrieved_docs", [])
-            }
-
-        tasks = [process_agent(name, agent) for name, agent in self.agents.items()]
-        results = await asyncio.gather(*tasks)
-        return dict(results)
-
-    async def _get_consultation_async(self, primary_agent: str, query: str) -> Dict[str, str]:
-        """Get consultation from other agents concurrently"""
-        async def get_agent_consultation(agent_name, agent):
-            if agent_name != primary_agent:
-                state = {"messages": [HumanMessage(content=query)]}
-                response = await agent.process_async(state)
-                return agent_name, response["messages"][-1].content
-            return None
-
-        tasks = [get_agent_consultation(name, agent) for name, agent in self.agents.items()]
-        responses = await asyncio.gather(*tasks)
-        return {k: v for k, v in responses if v is not None}
-
     async def multi_agent_consultation_async(self, state: AgentState) -> AgentState:
         """Execute multi-agent collaboration based on collaboration mode"""
         
@@ -67,9 +40,16 @@ class CollaborationSystem:
         if primary_agent:
             print(f"  - Primary Agent: {primary_agent}")
         
+        # Initialize thought process tracking
+        thought_process = []
+        thought_process.append(f"Initial Analysis: Query requires {collaboration_mode} collaboration")
+        if primary_agent:
+            thought_process.append(f"Primary Agent: {primary_agent} selected as lead")
+        
         # Execute appropriate collaboration strategy
         if collaboration_mode == "multi_perspective":
             print("\nGathering multi-perspective analysis...")
+            thought_process.append("Strategy: Gathering perspectives from all agents")
             # Get all relevant agent perspectives concurrently (now with docs)
             agent_outputs = await self._get_all_perspectives_async(current_query)
             agent_responses = {k: v["response"] for k, v in agent_outputs.items()}
@@ -80,26 +60,33 @@ class CollaborationSystem:
             state["consulting_agents"] = list(agent_responses.keys())
             state["retrieved_docs"] = all_docs  # Aggregate docs for workflow state
             print(f"  - Consulting Agents: {', '.join(state['consulting_agents'])}")
+            thought_process.append(f"Consulting Agents: {', '.join(state['consulting_agents'])}")
             final_response = await self._synthesize_perspectives_async(agent_responses, current_query)
+            thought_process.append("Synthesizing perspectives into final response")
             
         elif collaboration_mode == "consultation":
             print("\nGathering expert consultation...")
+            thought_process.append("Strategy: Primary agent with expert consultation")
             # Primary agent with consultation from others
             consultation = await self._get_consultation_async(primary_agent, current_query)
             other_agents = [agent for agent in self.agents.keys() if agent != primary_agent]
             state["consulting_agents"] = [primary_agent] + other_agents[:1]
             print(f"  - Primary Agent: {primary_agent}")
             print(f"  - Consulting Agent: {other_agents[0]}")
+            thought_process.append(f"Primary Agent: {primary_agent}")
+            thought_process.append(f"Consulting Agent: {other_agents[0]}")
             final_response = await self._get_enhanced_primary_response_async(primary_agent, current_query, consultation)
+            thought_process.append("Enhancing primary response with consultation")
             
         else:
             # This should never happen - raise an exception
             raise ValueError(f"Invalid collaboration mode: {collaboration_mode}. Expected 'multi_perspective' or 'consultation'")
         
-        # Update state with collaborative response
+        # Update state with collaborative response and thought process
         state["messages"].append(AIMessage(content=final_response))
         state["collaboration_confidence"] = 0.9
         state["agent_type"] = "team_collaboration"
+        state["thought_process"] = thought_process
         
         print("\nCollaboration Complete:")
         print(f"  - Final Agent Type: {state['agent_type']}")
@@ -107,6 +94,33 @@ class CollaborationSystem:
         print("-" * 40)
         
         return state
+    
+    async def _get_all_perspectives_async(self, query: str) -> Dict[str, Dict[str, str]]:
+        """Get responses and retrieved docs from all agents concurrently"""
+        async def process_agent(agent_name, agent):
+            state = {"messages": [HumanMessage(content=query)]}
+            response = await agent.process_async(state)
+            return agent_name, {
+                "response": response["messages"][-1].content,
+                "retrieved_docs": response.get("retrieved_docs", [])
+            }
+
+        tasks = [process_agent(name, agent) for name, agent in self.agents.items()]
+        results = await asyncio.gather(*tasks)
+        return dict(results)
+
+    async def _get_consultation_async(self, primary_agent: str, query: str) -> Dict[str, str]:
+        """Get consultation from other agents concurrently"""
+        async def get_agent_consultation(agent_name, agent):
+            if agent_name != primary_agent:
+                state = {"messages": [HumanMessage(content=query)]}
+                response = await agent.process_async(state)
+                return agent_name, response["messages"][-1].content
+            return None
+
+        tasks = [get_agent_consultation(name, agent) for name, agent in self.agents.items()]
+        responses = await asyncio.gather(*tasks)
+        return {k: v for k, v in responses if v is not None}
     
     async def _synthesize_perspectives_async(self, responses: Dict[str, str], query: str) -> str:
         """Synthesize multiple agent perspectives into a cohesive response"""
@@ -121,7 +135,7 @@ class CollaborationSystem:
 Perspectives:
 {perspectives}
 
-Provide a comprehensive response that integrates all relevant insights while maintaining clarity and coherence."""
+Provide a comprehensive response that integrates all relevant insights while maintaining clarity and coherence. Format the response using markdown for better readability. Use headings, lists, and bold text where appropriate."""
 
         # Use the synthesis agent to combine perspectives
         synthesis_response = await self.llm.ainvoke([HumanMessage(content=synthesis_prompt)])
@@ -152,7 +166,7 @@ Primary Response:
 Consultation:
 {consultation_text}
 
-Provide an enhanced response that incorporates relevant insights from the consultation while maintaining the primary perspective."""
+Provide an enhanced response that incorporates relevant insights from the consultation while maintaining the primary perspective. Format the response using markdown for better readability. Use headings, lists, and bold text where appropriate."""
 
         # Use the synthesis agent to enhance the response
         enhanced_response = await self.llm.ainvoke([HumanMessage(content=enhancement_prompt)])

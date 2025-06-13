@@ -88,8 +88,8 @@ class DatabaseManager:
             print("Failed to populate vector store.")
             return False
     
-    def search(self, query: str, agent_type: str = None, k: int = 5):
-        """Search the vector store with optional agent type filtering."""
+    def _perform_search(self, query: str, agent_type: str = None, k: int = 5):
+        """Internal method to perform the actual search with filtering."""
         if not self.vector_store:
             self.get_vector_store()
             
@@ -101,19 +101,16 @@ class DatabaseManager:
                     {"agent_type": "shared"}
                 ]} if agent_type != "shared" else {"agent_type": "shared"}
                 
-                results = self.vector_store.similarity_search_with_score(
+                return self.vector_store.similarity_search_with_score(
                     query=query,
                     k=k,
                     filter=where_filter
                 )
             else:
-                results = self.vector_store.similarity_search_with_score(
+                return self.vector_store.similarity_search_with_score(
                     query=query,
                     k=k
                 )
-            
-            return results
-            
         except Exception as e:
             print(f"Search error: {e}")
             # Fallback to simple similarity search without filter
@@ -122,11 +119,16 @@ class DatabaseManager:
             except Exception as fallback_error:
                 print(f"Fallback search also failed: {fallback_error}")
                 return []
+
+    def search(self, query: str, agent_type: str = None, k: int = 5):
+        """Synchronous search method."""
+        return self._perform_search(query, agent_type, k)
+
     async def asearch(self, query: str, agent_type: str = None, k: int = 5):
         """Async wrapper for the search method."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, lambda: self.search(query, agent_type, k)
+            None, lambda: self._perform_search(query, agent_type, k)
         )
     
     def test_searches(self):
