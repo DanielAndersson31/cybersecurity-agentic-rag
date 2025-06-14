@@ -10,16 +10,23 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 class DatabaseManager:
     """Manages vector database operations including creation, population, and testing."""
     
-    def __init__(self, persist_directory: str = "data/embeddings/chroma_db"):
+    def __init__(self, persist_directory: str = "data/embeddings/chroma_db", collection_name: str = "cybersecurity_knowledge"):
         # Use default path if persist_directory is None
         self.persist_directory = Path(persist_directory if persist_directory is not None else "data/embeddings/chroma_db")
+        self.collection_name = collection_name
         self.vector_store = None
+        
+        # Initialize embeddings with optimized settings
         self.embeddings = HuggingFaceEmbeddings(
             model_name="BAAI/bge-large-en-v1.5",
-            model_kwargs={'device': device},
+            model_kwargs={
+                'device': device,
+                'trust_remote_code': True  
+            },
             encode_kwargs={
                 'normalize_embeddings': True,
-                'batch_size': 128
+                'batch_size': 128 if device == "cuda" else 32, 
+                'show_progress_bar': True
             },
             show_progress=True
         )
@@ -58,6 +65,7 @@ class DatabaseManager:
                 metadatas=all_metadatas,
                 embedding=self.embeddings,
                 persist_directory=str(self.persist_directory),
+                collection_name=self.collection_name,
                 ids=all_ids
             )
             
@@ -91,34 +99,21 @@ class DatabaseManager:
     def _perform_search(self, query: str, agent_type: str = None, k: int = 5):
         """Internal method to perform the actual search with filtering."""
         if not self.vector_store:
-            self.get_vector_store()
-            
+            self.vector_store = self.get_vector_store()
+        
+        # Only filter if agent_type is specified
+        where_filter = {"agent_type": agent_type} if agent_type else None
+        
         try:
-            if agent_type:
-                # Create filter for agent type
-                where_filter = {"$or": [
-                    {"agent_type": agent_type},
-                    {"agent_type": "shared"}
-                ]} if agent_type != "shared" else {"agent_type": "shared"}
-                
-                return self.vector_store.similarity_search_with_score(
-                    query=query,
-                    k=k,
-                    filter=where_filter
-                )
-            else:
-                return self.vector_store.similarity_search_with_score(
-                    query=query,
-                    k=k
-                )
+            results = self.vector_store.similarity_search_with_score(
+                query=query,
+                k=k,
+                filter=where_filter
+            )
+            return results
         except Exception as e:
             print(f"Search error: {e}")
-            # Fallback to simple similarity search without filter
-            try:
-                return self.vector_store.similarity_search(query, k=k)
-            except Exception as fallback_error:
-                print(f"Fallback search also failed: {fallback_error}")
-                return []
+            return []
 
     def search(self, query: str, agent_type: str = None, k: int = 5):
         """Synchronous search method."""

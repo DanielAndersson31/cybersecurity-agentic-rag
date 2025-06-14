@@ -13,18 +13,22 @@ class ConversationTurn(TypedDict):
 
 class AgentState(TypedDict):
     """Represents the state of an agent, including its messages and metadata."""
-    # Your existing fields
     messages: Annotated[List[BaseMessage], add_messages]
-    agent_type: Optional[str]
+    agent_type: str
     retrieved_docs: List[dict]
-    confidence_score: Optional[float]
-    conversation_summary: Optional[str]  # Summary of the conversation
+    confidence_score: float
+    preferred_agent: str # Preferred agent for the query
+    llm_choice: str  # LLM choice for the query
+    thread_id: str  # Thread ID for the conversation / Session ID
     
-    collaboration_mode: Optional[str]  # "consultation", "multi_perspective"
+    collaboration_mode: str  # "consultation", "multi_perspective"
     consulting_agents: List[str]  # Which agents to consult
     agent_responses: Dict[str, str]  # Responses from each agent
     needs_collaboration: bool
-    primary_agent: Optional[str]  # Lead agent for this query
-    collaboration_confidence: Optional[float]  # Team confidence
-    thought_process: Optional[List[str]]  # Steps taken in processing the query
-    needs_web_search: Optional[bool]  # Whether the query needs web search
+    primary_agent: str  # Lead agent for this query
+    collaboration_confidence: float # Team confidence
+    thought_process: List[str] # Steps taken in processing the query
+    needs_web_search: bool  # Whether the query needs web search
+    conversation_summary: str  # Summary of the conversation
+
+    

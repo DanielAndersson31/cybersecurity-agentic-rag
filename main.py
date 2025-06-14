@@ -32,6 +32,14 @@ async def startup_event():
     await workflow.initialize()
     print("Workflow initialized.")
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on application shutdown."""
+    if workflow:
+        print("Closing workflow resources...")
+        await workflow.close()
+        print("Workflow closed.")
+
 @app.get("/")
 async def get(request: Request):
     """Serve the main chat interface."""
@@ -46,9 +54,10 @@ async def get_chat_history(session_id: str):
     try:
         # Retrieve the conversation state from the checkpointer
         config = {"configurable": {"thread_id": session_id}}
-        state = await workflow.app.aget_state(config)
+        async with workflow.checkpointer as checkpointer:
+            state = await workflow.app.aget_state(config)
         
-        if state:
+        if state and state.values:
             # Convert message objects to a serializable format
             history = []
             for msg in state.values.get("messages", []):
@@ -78,13 +87,26 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
             user_query = data.get("query")
             session_id = data.get("session_id") # Can be null for new chats
+            model_choice = data.get("model", "openai_mini")  # Default to openai_mini
+            agent_choice = data.get("agent", "auto")  # Default to auto
 
             if not user_query:
                 continue
 
             try:
-                # Process the query using the RAG workflow
-                result = await workflow.process_query_async(user_query, session_id)
+                # Create client config for the new API
+                client_config = {
+                    "configurable": {"thread_id": session_id or str(uuid.uuid4())},
+                    "preferred_llm_choice": model_choice,
+                    "preferred_agent": agent_choice if agent_choice != "auto" else None
+                }
+                
+                # Use the new process_query_async API
+                result = await workflow.process_query_async(user_query, client_config)
+                
+                # Add model and agent info to result
+                result["model_used"] = model_choice
+                result["agent_choice"] = agent_choice
                 
                 # Send the full result object as JSON
                 await websocket.send_json(result)
@@ -93,7 +115,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 error_message = f"Error processing query: {str(e)}"
                 print(error_message)
                 traceback.print_exc()
-                await websocket.send_json({"response": f"Sorry, an error occurred: {e}", "agent_type": "Error", "session_id": session_id})
+                await websocket.send_json({
+                    "response": f"Sorry, an error occurred: {e}", 
+                    "agent_type": "Error", 
+                    "session_id": session_id or str(uuid.uuid4()), 
+                    "model_used": model_choice, 
+                    "agent_choice": agent_choice
+                })
 
     except WebSocketDisconnect:
         print(f"Client disconnected.")

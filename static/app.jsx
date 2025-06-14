@@ -7,6 +7,25 @@ const App = () => {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   // Default to system preference, fallback to light
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+
+  // Handle legacy model selection and provide fallback
+  const getValidModel = (savedModel) => {
+    const validModels = ["openai_mini", "claude_sonnet"];
+    return validModels.includes(savedModel) ? savedModel : "openai_mini";
+  };
+
+  // Handle agent selection with validation
+  const getValidAgent = (savedAgent) => {
+    const validAgents = ["auto", "incident_response", "threat_intelligence", "prevention"];
+    return validAgents.includes(savedAgent) ? savedAgent : "auto";
+  };
+
+  const [selectedModel, setSelectedModel] = useState(
+    getValidModel(localStorage.getItem("selectedModel")) || "openai_mini"
+  );
+
+  const [selectedAgent, setSelectedAgent] = useState(getValidAgent(localStorage.getItem("selectedAgent")) || "auto");
+
   const ws = useRef(null);
 
   // --- EFFECTS ---
@@ -15,6 +34,16 @@ const App = () => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    // Save selected model to localStorage
+    localStorage.setItem("selectedModel", selectedModel);
+  }, [selectedModel]);
+
+  useEffect(() => {
+    // Save selected agent to localStorage
+    localStorage.setItem("selectedAgent", selectedAgent);
+  }, [selectedAgent]);
 
   useEffect(() => {
     // Initialize WebSocket connection
@@ -96,7 +125,14 @@ const App = () => {
       }));
     }
 
-    ws.current.send(JSON.stringify({ query, session_id: sessionIdToSend }));
+    ws.current.send(
+      JSON.stringify({
+        query,
+        session_id: sessionIdToSend,
+        model: selectedModel,
+        agent: selectedAgent,
+      })
+    );
   };
 
   const handleNewChat = () => {
@@ -134,13 +170,24 @@ const App = () => {
         onDeleteChat={handleDeleteChat}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <ChatWindow chat={currentSessionId ? chats[currentSessionId] : null} onSendMessage={handleSendMessage} />
+      <ChatWindow
+        chat={currentSessionId ? chats[currentSessionId] : null}
+        onSendMessage={handleSendMessage}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        selectedAgent={selectedAgent}
+        onAgentChange={setSelectedAgent}
+      />
       {isSettingsOpen && (
         <SettingsModal
           onClose={() => setSettingsOpen(false)}
           theme={theme}
           onToggleTheme={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
           onClearChats={handleClearChats}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          selectedAgent={selectedAgent}
+          onAgentChange={setSelectedAgent}
         />
       )}
     </div>
@@ -188,7 +235,7 @@ const Sidebar = ({ chats, currentSessionId, onChatSelect, onNewChat, onDeleteCha
   </div>
 );
 
-const ChatWindow = ({ chat, onSendMessage }) => {
+const ChatWindow = ({ chat, onSendMessage, selectedModel, onModelChange, selectedAgent, onAgentChange }) => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -217,7 +264,13 @@ const ChatWindow = ({ chat, onSendMessage }) => {
         {chat?.isTyping && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </main>
-      <InputArea onSendMessage={onSendMessage} />
+      <InputArea
+        onSendMessage={onSendMessage}
+        selectedModel={selectedModel}
+        onModelChange={onModelChange}
+        selectedAgent={selectedAgent}
+        onAgentChange={onAgentChange}
+      />
     </div>
   );
 };
@@ -234,9 +287,21 @@ const Header = () => (
   </header>
 );
 
-const InputArea = ({ onSendMessage }) => {
+const InputArea = ({ onSendMessage, selectedModel, onModelChange, selectedAgent, onAgentChange }) => {
   const [input, setInput] = useState("");
   const suggestionChips = ["Security Breach", "Ransomware Intel", "Prevention Tips"];
+
+  const modelOptions = [
+    { value: "openai_mini", label: "GPT-4o Mini", icon: "🤖" },
+    { value: "claude_sonnet", label: "Claude Sonnet 3.5", icon: "🎭" },
+  ];
+
+  const agentOptions = [
+    { value: "auto", label: "Auto-Select", icon: "🎯" },
+    { value: "incident_response", label: "Incident Response", icon: "🚨" },
+    { value: "threat_intelligence", label: "Threat Intelligence", icon: "🕵️" },
+    { value: "prevention", label: "Prevention", icon: "🛡️" },
+  ];
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
@@ -261,6 +326,42 @@ const InputArea = ({ onSendMessage }) => {
           </button>
         ))}
       </div>
+
+      {/* Model and Agent Selectors */}
+      <div className="flex justify-center gap-4 mb-3">
+        {/* Model Selector */}
+        <div className="flex flex-col items-center">
+          <label className="text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
+          <select
+            value={selectedModel}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {modelOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.icon} {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Agent Selector */}
+        <div className="flex flex-col items-center">
+          <label className="text-xs text-gray-600 dark:text-gray-400 mb-1">Agent</label>
+          <select
+            value={selectedAgent}
+            onChange={(e) => onAgentChange(e.target.value)}
+            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {agentOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.icon} {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <form onSubmit={handleFormSubmit} className="flex gap-4 items-center">
         <input
           type="text"
@@ -286,6 +387,25 @@ const Message = ({ message }) => {
   const content = isUser ? message.content : message.content.response;
   const agentData = isUser ? null : message.content;
 
+  const getModelDisplayName = (modelValue) => {
+    const modelMap = {
+      openai_mini: "GPT-4o Mini",
+      claude_sonnet: "Claude Sonnet 3.5",
+    };
+    return modelMap[modelValue] || modelValue;
+  };
+
+  const getAgentDisplayName = (agentValue) => {
+    const agentMap = {
+      auto: "🎯 Auto-Select",
+      incident_response: "🚨 Incident Response",
+      threat_intelligence: "🕵️ Threat Intelligence",
+      prevention: "🛡️ Prevention",
+      team_collaboration: "🤝 Team Collaboration",
+    };
+    return agentMap[agentValue] || agentValue;
+  };
+
   return (
     <div className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser && (
@@ -299,31 +419,45 @@ const Message = ({ message }) => {
         }`}
       >
         <div dangerouslySetInnerHTML={{ __html: marked.parse(content || "") }} />
-        {agentData?.was_collaboration && (
-          <details className="mt-3 border-t border-gray-300/50 dark:border-gray-500/50 pt-2 text-sm">
-            <summary className="cursor-pointer font-semibold">Collaboration Details</summary>
-            <ul className="list-disc pl-5 mt-1 text-xs">
-              <li>
-                <strong>Mode:</strong> {agentData.collaboration_mode}
-              </li>
-              <li>
-                <strong>Primary Agent:</strong> {agentData.primary_agent || "N/A"}
-              </li>
-              <li>
-                <strong>Consulting Agents:</strong> {agentData.consulting_agents.join(", ")}
-              </li>
-              {agentData.thought_process && (
-                <li className="mt-2">
-                  <strong>Thought Process:</strong>
-                  <ul className="list-disc pl-5 mt-1">
-                    {agentData.thought_process.map((step, index) => (
-                      <li key={index}>{step}</li>
-                    ))}
-                  </ul>
-                </li>
-              )}
-            </ul>
-          </details>
+        {!isUser && agentData && (
+          <div className="mt-3 border-t border-gray-300/50 dark:border-gray-500/50 pt-2 text-xs text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Model:</span>
+                <span>{getModelDisplayName(agentData.model_used)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Agent:</span>
+                <span>{getAgentDisplayName(agentData.agent_type)}</span>
+              </div>
+            </div>
+            {agentData.was_collaboration && (
+              <details className="text-sm">
+                <summary className="cursor-pointer font-semibold">Collaboration Details</summary>
+                <ul className="list-disc pl-5 mt-1 text-xs">
+                  <li>
+                    <strong>Mode:</strong> {agentData.collaboration_mode}
+                  </li>
+                  <li>
+                    <strong>Primary Agent:</strong> {agentData.primary_agent || "N/A"}
+                  </li>
+                  <li>
+                    <strong>Consulting Agents:</strong> {agentData.consulting_agents.join(", ")}
+                  </li>
+                  {agentData.thought_process && (
+                    <li className="mt-2">
+                      <strong>Thought Process:</strong>
+                      <ul className="list-disc pl-5 mt-1">
+                        {agentData.thought_process.map((step, index) => (
+                          <li key={index}>{step}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  )}
+                </ul>
+              </details>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -343,36 +477,87 @@ const TypingIndicator = () => (
   </div>
 );
 
-const SettingsModal = ({ onClose, theme, onToggleTheme, onClearChats }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 transition-opacity">
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-      <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Settings</h2>
-        <button onClick={onClose} className="text-2xl text-gray-500 hover:text-red-500 dark:hover:text-red-400">
-          &times;
-        </button>
-      </div>
-      <div className="mt-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <label className="text-lg text-gray-700 dark:text-gray-200">Dark Mode</label>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" checked={theme === "dark"} onChange={onToggleTheme} className="sr-only peer" />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-          </label>
-        </div>
-        <div className="flex justify-between items-center">
-          <label className="text-lg text-gray-700 dark:text-gray-200">Manage Data</label>
-          <button
-            onClick={onClearChats}
-            className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Clear All Chats
+const SettingsModal = ({
+  onClose,
+  theme,
+  onToggleTheme,
+  onClearChats,
+  selectedModel,
+  onModelChange,
+  selectedAgent,
+  onAgentChange,
+}) => {
+  const modelOptions = [
+    { value: "openai_mini", label: "GPT-4o Mini", icon: "🤖" },
+    { value: "claude_sonnet", label: "Claude Sonnet 3.5", icon: "🎭" },
+  ];
+
+  const agentOptions = [
+    { value: "auto", label: "Auto-Select", icon: "🎯" },
+    { value: "incident_response", label: "Incident Response", icon: "🚨" },
+    { value: "threat_intelligence", label: "Threat Intelligence", icon: "🕵️" },
+    { value: "prevention", label: "Prevention", icon: "🛡️" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 transition-opacity">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Settings</h2>
+          <button onClick={onClose} className="text-2xl text-gray-500 hover:text-red-500 dark:hover:text-red-400">
+            &times;
           </button>
+        </div>
+        <div className="mt-6 space-y-6">
+          <div className="flex justify-between items-center">
+            <label className="text-lg text-gray-700 dark:text-gray-200">Dark Mode</label>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={theme === "dark"} onChange={onToggleTheme} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+          <div className="flex justify-between items-center">
+            <label className="text-lg text-gray-700 dark:text-gray-200">AI Model</label>
+            <select
+              value={selectedModel}
+              onChange={(e) => onModelChange(e.target.value)}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {modelOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.icon} {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-between items-center">
+            <label className="text-lg text-gray-700 dark:text-gray-200">AI Agent</label>
+            <select
+              value={selectedAgent}
+              onChange={(e) => onAgentChange(e.target.value)}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {agentOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.icon} {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-between items-center">
+            <label className="text-lg text-gray-700 dark:text-gray-200">Manage Data</label>
+            <button
+              onClick={onClearChats}
+              className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Clear All Chats
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
