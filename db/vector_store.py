@@ -26,9 +26,7 @@ class DatabaseManager:
             encode_kwargs={
                 'normalize_embeddings': True,
                 'batch_size': 128 if device == "cuda" else 32, 
-                'show_progress_bar': True
             },
-            show_progress=True
         )
     
     def _create_vector_store(self) -> Chroma:
@@ -110,7 +108,18 @@ class DatabaseManager:
                 k=k,
                 filter=where_filter
             )
-            return results
+            
+            # Format results into a list of dictionaries
+            formatted_results = []
+            for doc, score in results:
+                formatted_results.append({
+                    "source": "knowledge_base",
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": score
+                })
+            return formatted_results
+
         except Exception as e:
             print(f"Search error: {e}")
             return []
@@ -149,17 +158,15 @@ class DatabaseManager:
             if results:
                 print(f"Found {len(results)} results:")
                 for i, result in enumerate(results):
-                    if isinstance(result, tuple):  # (doc, score)
-                        doc, score = result
-                        print(f"  Result {i+1} (Score: {score:.4f}):")
-                        print(f"    Metadata: {doc.metadata}")
-                        content = doc.page_content
-                    else:  # just doc
-                        doc = result
-                        print(f"  Result {i+1}:")
-                        print(f"    Metadata: {doc.metadata}")
-                        content = doc.page_content
+                    score = result.get("score", 0.0)
+                    metadata = result.get("metadata", {})
+                    content = result.get("content", "")
                     
+                    # Ensure score is a float for formatting
+                    score_display = f"{score:.4f}" if isinstance(score, float) else str(score)
+
+                    print(f"  Result {i+1} (Score: {score_display}):")
+                    print(f"    Metadata: {metadata}")
                     print(f"    Document: {content[:200]}{'...' if len(content) > 200 else ''}")
                     print("-" * 20)
             else:
